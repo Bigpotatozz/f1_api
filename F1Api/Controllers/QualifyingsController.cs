@@ -20,84 +20,25 @@ namespace F1Api.Controllers
             _context = context;
         }
 
-        // GET: api/Qualifyings
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Qualifying>>> GetQualifyings()
-        {
-            return await _context.Qualifyings.ToListAsync();
-        }
 
-        // GET: api/Qualifyings/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Qualifying>> GetQualifying(int id)
-        {
-            var qualifying = await _context.Qualifyings.FindAsync(id);
+        [HttpGet("qualy/poles/{year}")]
+        public async Task<IActionResult> getPoles(int year) {
 
-            if (qualifying == null)
-            {
-                return NotFound();
-            }
-
-            return qualifying;
-        }
-
-        // PUT: api/Qualifyings/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutQualifying(int id, Qualifying qualifying)
-        {
-            if (id != qualifying.Qualifyid)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(qualifying).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!QualifyingExists(id))
+            var poles = await _context.Qualifyings
+                .Where(y => y.Race.Year == year && y.Position == 1)
+                .GroupBy(d => d.Driver.Code).Select(g => new
                 {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+                    code = g.Key,
+                    poles = g.Count()
+                })
+                .ToListAsync();
 
-            return NoContent();
+            return Ok(poles);
+
         }
-
-        // POST: api/Qualifyings
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<Qualifying>> PostQualifying(Qualifying qualifying)
-        {
-            _context.Qualifyings.Add(qualifying);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetQualifying", new { id = qualifying.Qualifyid }, qualifying);
-        }
-
-        // DELETE: api/Qualifyings/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteQualifying(int id)
-        {
-            var qualifying = await _context.Qualifyings.FindAsync(id);
-            if (qualifying == null)
-            {
-                return NotFound();
-            }
-
-            _context.Qualifyings.Remove(qualifying);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+    
+    
+      
 
         private bool QualifyingExists(int id)
         {

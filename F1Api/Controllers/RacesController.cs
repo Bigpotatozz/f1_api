@@ -21,83 +21,32 @@ namespace F1Api.Controllers
         }
 
         // GET: api/Races
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Race>>> GetRaces()
+        [HttpGet("races/{year}")]
+        public async Task<IActionResult> GetRaces(int year)
         {
-            return await _context.Races.ToListAsync();
+          var races =  await _context.Races.GroupBy(r => r.Year).Select(g => new { Year = g.Key, Count = g.Count() }).Where(e => e.Year == year).ToListAsync();
+
+            return Ok(value: races);
         }
 
-        // GET: api/Races/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Race>> GetRace(int id)
-        {
-            var race = await _context.Races.FindAsync(id);
+        [HttpGet("races/dnf/{year}")]
+        public async Task<IActionResult> getDNF(int year) {
 
-            if (race == null)
+            var cantidadDnfs = await _context.Results
+                  .Where(r => r.Position == null && r.Race.Year == 2020)
+                  .CountAsync();
+
+            var dnf = new
             {
-                return NotFound();
-            }
+                dnf = cantidadDnfs
+            };
 
-            return race;
+            return Ok(dnf);
+
+
+          
         }
 
-        // PUT: api/Races/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutRace(int id, Race race)
-        {
-            if (id != race.Raceid)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(race).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!RaceExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/Races
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<Race>> PostRace(Race race)
-        {
-            _context.Races.Add(race);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetRace", new { id = race.Raceid }, race);
-        }
-
-        // DELETE: api/Races/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteRace(int id)
-        {
-            var race = await _context.Races.FindAsync(id);
-            if (race == null)
-            {
-                return NotFound();
-            }
-
-            _context.Races.Remove(race);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
 
         private bool RaceExists(int id)
         {

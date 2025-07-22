@@ -21,10 +21,16 @@ namespace F1Api.Controllers
         }
 
         // GET: api/Drivers
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Driver>>> GetDrivers()
+        [HttpGet("drivers/{year}")]
+        public async Task<IActionResult> GetDrivers(int year)
         {
-            return await _context.Drivers.ToListAsync();
+    
+            var cantidadPilotos = await _context.DriverStandings.GroupBy(ds => ds.Race.Year).Select(g => new {
+                Year = g.Key,
+                UniqueDrivers = g.Select(ds => ds.Driverid).Distinct().Count()
+            }).Where(y => y.Year == year).ToListAsync();
+
+            return Ok(cantidadPilotos);
         }
 
         // GET: api/Drivers/5
@@ -41,63 +47,67 @@ namespace F1Api.Controllers
             return driver;
         }
 
-        // PUT: api/Drivers/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutDriver(int id, Driver driver)
+        [HttpGet("drivers/points/{year}")]
+        public async Task<IActionResult> getDriversPoints(int year) { 
+        
+            var pointsPerDriver = await _context.DriverStandings
+                                    .Where(ds => ds.Race.Year == year)
+                                    .GroupBy(ds => ds.Driver.Code)
+                                    .Select(g => new
+                                    {
+                                        Code = g.Key,
+                                        TotalPoints = g.Sum(x => x.Points)
+                                    })
+                                    .ToListAsync();
+
+            return Ok(pointsPerDriver);
+        }
+
+        [HttpGet("drivers/winners/{year}")]
+        public async Task<IActionResult> getWinnerDrivers(int year)
         {
-            if (id != driver.Driverid)
-            {
-                return BadRequest();
-            }
 
-            _context.Entry(driver).State = EntityState.Modified;
+            var totalCarreras2024 = await _context.Races
+                                        .Where(r => r.Year == year)
+                                        .CountAsync();
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!DriverExists(id))
+
+            var pointsPerDriver = await _context.Results
+                                            .Where(r => r.Position == 1 && r.Race.Year == year)
+                                            .GroupBy(r => r.Driver.Code)
+                                            .Select(g => new
+                                            {
+                                                Code = g.Key,
+                                                Victorias = g.Count(),
+                                                PorcentajeVictorias = (double)g.Count() * 100 / totalCarreras2024
+                                            })
+                                            .OrderByDescending(x => x.PorcentajeVictorias)
+                                            .ToListAsync();
+
+            return Ok(pointsPerDriver);
+        }
+
+        [HttpGet("drivers/champion/{year}")]
+        public async Task<IActionResult> getChampion(int year) {
+
+            var champion = await _context.DriverStandings
+                .Where(y => y.Race.Year == year)
+                .GroupBy(d => d.Driver.Code)
+                .Select(g => new
                 {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+                    code = g.Key,
+                    points = g.Sum(x => x.Points)
+                })
+                .OrderByDescending(c => c.points)
+                .ToListAsync();
 
-            return NoContent();
+            var resultado = champion.FirstOrDefault();
+
+            return Ok(resultado);
         }
 
-        // POST: api/Drivers
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<Driver>> PostDriver(Driver driver)
-        {
-            _context.Drivers.Add(driver);
-            await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetDriver", new { id = driver.Driverid }, driver);
-        }
 
-        // DELETE: api/Drivers/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteDriver(int id)
-        {
-            var driver = await _context.Drivers.FindAsync(id);
-            if (driver == null)
-            {
-                return NotFound();
-            }
-
-            _context.Drivers.Remove(driver);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
 
         private bool DriverExists(int id)
         {

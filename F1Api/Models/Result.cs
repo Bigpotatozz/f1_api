@@ -44,4 +44,7 @@ public partial class Result
     public virtual Driver? Driver { get; set; }
 
     public virtual Race? Race { get; set; }
+    
+    public virtual Constructor? Constructor { get; set; }
+
 }

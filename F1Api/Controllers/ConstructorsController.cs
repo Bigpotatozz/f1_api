@@ -21,83 +21,85 @@ namespace F1Api.Controllers
         }
 
         // GET: api/Constructors
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Constructor>>> GetConstructors()
+        [HttpGet("constructors/{year}")]
+        public async Task<ActionResult> GetConstructors(int year)
         {
-            return await _context.Constructors.ToListAsync();
-        }
 
-        // GET: api/Constructors/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Constructor>> GetConstructor(int id)
-        {
-            var constructor = await _context.Constructors.FindAsync(id);
-
-            if (constructor == null)
-            {
-                return NotFound();
-            }
-
-            return constructor;
-        }
-
-        // PUT: api/Constructors/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutConstructor(int id, Constructor constructor)
-        {
-            if (id != constructor.Constructorid)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(constructor).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ConstructorExists(id))
+            var resultado = await _context.ConstructorStandings
+            .GroupBy(c => c.Race.Year)
+            .Select(g => new
                 {
-                    return NotFound();
-                }
-                else
+                    Year = g.Key,
+                    UniqueConstructors = g.Select(c => c.Constructorid).Distinct().Count()
+                }).Where(y => y.Year == year)
+            .ToListAsync();
+
+
+            return Ok(resultado);
+
+        }
+
+
+        [HttpGet("constructors/points/{year}")]
+        public async Task<ActionResult> getConstructorsPoints(int year) {
+
+            var resultado = await _context.ConstructorStandings
+                .Where(y => y.Race.Year == year)
+                .GroupBy(c => c.Constructor.Name)
+                .Select(s => new
                 {
-                    throw;
-                }
-            }
+                    name = s.Key,
+                    points = s.Sum(p => p.Points)
+                })
+             
+                .ToListAsync();
 
-            return NoContent();
+
+            return Ok(resultado);
         }
 
-        // POST: api/Constructors
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<Constructor>> PostConstructor(Constructor constructor)
-        {
-            _context.Constructors.Add(constructor);
-            await _context.SaveChangesAsync();
+        [HttpGet("constructors/winners/{year}")]
+        public async Task<IActionResult> getConstructorWinners(int year) {
 
-            return CreatedAtAction("GetConstructor", new { id = constructor.Constructorid }, constructor);
+            var totalCarreras2024 = await _context.Races
+                                    .Where(r => r.Year == year)
+                                    .CountAsync();
+
+
+            var pointsPerDriver = await _context.Results
+                                            .Where(r => r.Position == 1 && r.Race.Year == year)
+                                            .GroupBy(r => r.Constructor.Name)
+                                            .Select(g => new
+                                            {
+                                                Code = g.Key,
+                                                Victorias = g.Count(),
+                                                PorcentajeVictorias = (double)g.Count() * 100 / totalCarreras2024
+                                            })
+                                            .OrderByDescending(x => x.PorcentajeVictorias)
+                                            .ToListAsync();
+
+            return Ok(pointsPerDriver);
         }
 
-        // DELETE: api/Constructors/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteConstructor(int id)
-        {
-            var constructor = await _context.Constructors.FindAsync(id);
-            if (constructor == null)
-            {
-                return NotFound();
-            }
 
-            _context.Constructors.Remove(constructor);
-            await _context.SaveChangesAsync();
+        [HttpGet("constructors/champion/{year}")]
+        public async Task<IActionResult> getChampion(int year) {
 
-            return NoContent();
+            var champion = await _context.ConstructorStandings
+                .Where(c => c.Race.Year == year)
+                .GroupBy(c => c.Constructor.Name).Select(g => new
+                {
+                    ConstructorName = g.Key,
+                    points = g.Sum(x => x.Points)
+                })
+                .OrderByDescending(x => x.points)
+                .ToListAsync();
+
+
+            var result = champion.FirstOrDefault();
+            return Ok(result);
         }
+
 
         private bool ConstructorExists(int id)
         {
